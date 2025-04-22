@@ -1,14 +1,21 @@
 #include "lab.h"
 #include <pthread.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <stdio.h>
+
 /**
      * @brief opaque type definition for a queue
      */
     struct queue {
       void** data;
-      int startIndex;
+      int dequeueIndex;
+      int enqueueIndex;
       int count;
       int capacity;
       bool shutdown;
+      pthread_cond_t fill, empty;
+      pthread_mutex_t dataLock;
     };
     /**
      * @brief Initialize a new queue
@@ -23,8 +30,12 @@
       newQueue->data = malloc(sizeof(void*) * newQueue->capacity);
       if (!newQueue->data) { return NULL; }
       newQueue->shutdown = false;
+      newQueue->enqueueIndex = 0;
+      newQueue->dequeueIndex = 0;
       newQueue->count = 0;
-      newQueue->startIndex = 0;
+      pthread_cond_init(&newQueue->fill, NULL);
+      pthread_cond_init(&newQueue->empty, NULL);
+      pthread_mutex_init(&newQueue->dataLock, NULL);
       return newQueue;
     }
 
@@ -46,9 +57,16 @@
      * @param data the data to add
      */
     void enqueue(queue_t q, void *data) {
-        q->data[(q->startIndex + q->count) % q->capacity] = data;
-        q->count = (q->count + 1) % q->capacity;
-        return;
+      pthread_mutex_lock(&q->dataLock);
+      while(q->count == q->capacity) {
+        pthread_cond_wait(&q->empty, &q->dataLock);
+      }
+      q->data[q->enqueueIndex] = data;
+      q->enqueueIndex = (q->enqueueIndex + 1) % q->capacity;
+      q->count++;
+      pthread_cond_signal(&q->fill);
+      pthread_mutex_unlock(&q->dataLock);
+      return;
     }
 
     /**
@@ -57,10 +75,20 @@
      * @param q the queue
      */
     void *dequeue(queue_t q) {
-      void* returnVal = q->data[q->startIndex];
-      q->startIndex = (q->startIndex + 1) % q->capacity;
+      pthread_mutex_lock(&q->dataLock);
+      while(!q->shutdown && q->count == 0) {
+        pthread_cond_wait(&q->fill, &q->dataLock);
+      }
+      if (q->shutdown) {
+        pthread_mutex_unlock(&q->dataLock);
+        return NULL;
+      }
+      void* tmp = q->data[q->dequeueIndex];
+      q->dequeueIndex = (q->dequeueIndex + 1) % q->capacity;
       q->count--;
-      return returnVal;
+      pthread_cond_signal(&q->empty);
+      pthread_mutex_unlock(&q->dataLock);
+      return tmp;
     }
 
     /**
@@ -71,6 +99,7 @@
      */
    void queue_shutdown(queue_t q) {
       q->shutdown = true;
+      pthread_cond_broadcast(&q->fill);
    }
 
     /**
