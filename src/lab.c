@@ -33,9 +33,9 @@
       newQueue->enqueueIndex = 0;
       newQueue->dequeueIndex = 0;
       newQueue->count = 0;
-      pthread_cond_init(&newQueue->fill, NULL);
-      pthread_cond_init(&newQueue->empty, NULL);
-      pthread_mutex_init(&newQueue->dataLock, NULL);
+      newQueue->fill = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
+      newQueue->empty = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
+      newQueue->dataLock = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
       return newQueue;
     }
 
@@ -45,6 +45,10 @@
      * @param q a queue to free
      */
     void queue_destroy(queue_t q) {
+      if (!q) { return; }
+      pthread_mutex_destroy(&q->dataLock);
+      pthread_cond_destroy(&q->fill);
+      pthread_cond_destroy(&q->empty);
       free(q->data);
       free(q);
       return;
@@ -76,10 +80,10 @@
      */
     void *dequeue(queue_t q) {
       pthread_mutex_lock(&q->dataLock);
-      while(!q->shutdown && q->count == 0) {
+      while(!is_shutdown(q) && q->count == 0) {
         pthread_cond_wait(&q->fill, &q->dataLock);
       }
-      if (q->shutdown) {
+      if (is_shutdown(q) && q->count == 0) {
         pthread_mutex_unlock(&q->dataLock);
         return NULL;
       }
@@ -98,8 +102,11 @@
      * @param q The queue
      */
    void queue_shutdown(queue_t q) {
-      q->shutdown = true;
+      pthread_mutex_lock(&q->dataLock);
+      q->shutdown = 1;
       pthread_cond_broadcast(&q->fill);
+      pthread_mutex_unlock(&q->dataLock);
+      return;
    }
 
     /**
