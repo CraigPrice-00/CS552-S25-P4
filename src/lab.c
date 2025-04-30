@@ -4,9 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-/**
-     * @brief opaque type definition for a queue
-     */
+    // struct queue: the queue which implements the bounded buffer problem
     struct queue {
       void** data;
       int dequeueIndex;
@@ -17,11 +15,10 @@
       pthread_cond_t fill, empty;
       pthread_mutex_t dataLock;
     };
-    /**
-     * @brief Initialize a new queue
-     *
-     * @param capacity the maximum capacity of the queue
-     * @return A fully initialized queue
+    
+    /* queue_init: this function initializes a queue with a specified capacity
+     * capacity: the capacity of the queue
+     * queue_t: the initialized queue
      */
     queue_t queue_init(int capacity) {
       queue_t newQueue = malloc(sizeof(struct queue));
@@ -39,10 +36,8 @@
       return newQueue;
     }
 
-    /**
-     * @brief Frees all memory and related data signals all waiting threads.
-     *
-     * @param q a queue to free
+    /* queue_destroy: this function destroys the queue and associated data
+     * q: the queue to destroy
      */
     void queue_destroy(queue_t q) {
       if (!q) { return; }
@@ -54,11 +49,9 @@
       return;
     }
 
-    /**
-     * @brief Adds an element to the back of the queue
-     *
-     * @param q the queue
-     * @param data the data to add
+    /* enqueue: this function enqueues data at the back of the queue
+     * q: the queue to add data to
+     * data: the data to add
      */
     void enqueue(queue_t q, void *data) {
       pthread_mutex_lock(&q->dataLock);
@@ -73,17 +66,16 @@
       return;
     }
 
-    /**
-     * @brief Removes the first element in the queue.
-     *
-     * @param q the queue
+    /* dequeue - this function removes and returns the item at the front of the queue
+     * q: the queue to dequeue from
+     * returns the data at the front of the queue
      */
     void *dequeue(queue_t q) {
       pthread_mutex_lock(&q->dataLock);
-      while(!is_shutdown(q) && q->count == 0) {
+      while(!is_shutdown(q) && is_empty(q)) {
         pthread_cond_wait(&q->fill, &q->dataLock);
       }
-      if (is_shutdown(q) && q->count == 0) {
+      if (is_shutdown(q) && is_empty(q)) {
         pthread_mutex_unlock(&q->dataLock);
         return NULL;
       }
@@ -95,11 +87,8 @@
       return tmp;
     }
 
-    /**
-     * @brief Set the shutdown flag in the queue so all threads can
-     * complete and exit properly
-     *
-     * @param q The queue
+    /* queue_shutdown: this function sets the shutdown flag and signals all consumers to finish up
+     * q: the queue to shutdown
      */
    void queue_shutdown(queue_t q) {
       pthread_mutex_lock(&q->dataLock);
@@ -109,19 +98,17 @@
       return;
    }
 
-    /**
-     * @brief Returns true is the queue is empty
-     *
-     * @param q the queue
+    /* is_empty: this function checks if the queue is empty
+     * q: the queue to check
+     * returns true if empty
      */
     bool is_empty(queue_t q) {
       return !q->count;
     }
 
-    /**
-     * @brief
-     *
-     * @param q The queue
+    /* is_shutdown: this function checks if the queue is shutdown
+     * q: the queue to check
+     * returns true if shut down
      */
     bool is_shutdown(queue_t q) {
       return q->shutdown;

@@ -1,19 +1,25 @@
-# Makefile Project Template
+# CS552 P4 - Bounded Buffer
 
-Steps to configure, build, run, and test the project.
+Steps to configure, build, run, and test the bounded buffer.
 
 ## Building
 
 ```bash
 make
 ```
+## Build Debug version
 
+```bash
+make debug
+```
 ## Testing
 
 ```bash
 make check
 ```
-
+```bash
+./myprogram
+```
 ## Clean
 
 ```bash
